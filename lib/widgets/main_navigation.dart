@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../screens/analysis_screen.dart';
-import '../screens/add_transaction_screen.dart';
+import '../screens/enhanced_add_transaction_screen.dart';
 import '../screens/export_screen.dart';
 import '../screens/import_screen.dart';
 import '../screens/settings_screen.dart';
@@ -202,7 +202,7 @@ class _MainNavigationState extends State<MainNavigation>
     final screens = [
       widget.homeScreen,
       const AnalysisScreen(),
-      const AddTransactionScreen(),
+      const EnhancedAddTransactionScreen(),
       _buildDataManagementScreen(),
       const SettingsScreen(),
     ];
