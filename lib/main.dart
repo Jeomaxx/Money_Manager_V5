@@ -321,17 +321,17 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 SliverToBoxAdapter(
                   child: Column(
                     children: [
-                  // Animated Balance Summary Card
-                  AnimatedBuilder(
-                    animation: _balanceAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _balanceAnimation.value,
-                        child: Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.all(16),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
+                      // Animated Balance Summary Card
+                      AnimatedBuilder(
+                        animation: _balanceAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _balanceAnimation.value,
+                            child: Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [Colors.teal.shade400, Colors.teal.shade600],
                               begin: Alignment.topLeft,
