@@ -117,7 +117,7 @@ class AnimatedBalanceCard extends StatelessWidget {
       ),
     )
         .animate()
-        .scale(begin: 0.8, duration: 400.ms)
+        .scaleXY(begin: 0.8, duration: 400.ms)
         .fadeIn(duration: 400.ms);
   }
 }

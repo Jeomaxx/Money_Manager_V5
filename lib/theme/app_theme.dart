@@ -86,7 +86,7 @@ class AppTheme {
     ),
     
     // Card Theme
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       elevation: 2,
       margin: EdgeInsets.symmetric(
         horizontal: spacingL,
@@ -229,7 +229,7 @@ class AppTheme {
       titleSpacing: spacingL,
     ),
     
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       elevation: 2,
       margin: EdgeInsets.symmetric(
         horizontal: spacingL,

@@ -15,6 +15,7 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'widgets/main_navigation.dart';
 
 void main() {
   runApp(
@@ -71,7 +72,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
 
     if (_isLoggedIn) {
-      return const MyHomePage(title: 'مدير المصروفات الشخصية');
+      return MainNavigation(
+        homeScreen: const MyHomePage(
+          title: 'مدير المصروفات الشخصية',
+          isEmbedded: true,
+        ),
+      );
     } else {
       return const LoginScreen();
     }
@@ -108,7 +114,12 @@ class MyApp extends StatelessWidget {
           
           home: const AuthWrapper(),
           routes: {
-            '/home': (context) => const MyHomePage(title: 'مدير المصروفات الشخصية'),
+            '/home': (context) => MainNavigation(
+              homeScreen: const MyHomePage(
+                title: 'مدير المصروفات الشخصية',
+                isEmbedded: true,
+              ),
+            ),
             '/login': (context) => const LoginScreen(),
             '/register': (context) => const RegisterScreen(),
           },
@@ -119,18 +130,14 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+  const MyHomePage({
+    super.key, 
+    required this.title,
+    this.isEmbedded = false,
+  });
 
   final String title;
+  final bool isEmbedded;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -301,25 +308,19 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl, // Force RTL layout
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          title: Text(widget.title),
-          centerTitle: true,
-        ),
-        drawer: _buildNavigationDrawer(),
-        body: _isLoading
-            ? _buildLoadingState()
-            : RefreshIndicator(
-                onRefresh: _loadData,
-                color: Colors.teal,
-                backgroundColor: Colors.white,
-                child: Column(
-                children: [
+  Widget _buildMainContent() {
+    return _isLoading
+        ? _buildLoadingState()
+        : RefreshIndicator(
+            onRefresh: _loadData,
+            color: Colors.teal,
+            backgroundColor: Colors.white,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
                   // Animated Balance Summary Card
                   AnimatedBuilder(
                     animation: _balanceAnimation,
@@ -444,58 +445,96 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  // Transactions List
-                  Expanded(
-                    child: _transactions.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.receipt_long,
-                                  size: 64,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'لا توجد معاملات بعد',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'اضغط على الزر البرتقالي لإضافة بيانات تجريبية',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _transactions.length,
-                            itemBuilder: (context, index) {
-                              final transaction = _transactions[index];
-                              return TransactionListItem(
-                                transaction: transaction,
-                                onTap: () {
-                                  // TODO: Navigate to transaction details/edit
-                                },
-                                onLongPress: () {
-                                  // TODO: Show delete/edit options
-                                },
-                              );
-                            },
-                          ),
+                      const SizedBox(height: 8),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+                // Transactions List
+                _transactions.isEmpty
+                    ? SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_long,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'لا توجد معاملات بعد',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'ابدأ بإضافة أول معاملة لك',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              if (widget.isEmbedded)
+                                ElevatedButton.icon(
+                                  onPressed: _addSampleData,
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  label: const Text('إضافة بيانات تجريبية'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final transaction = _transactions[index];
+                            return TransactionListItem(
+                              transaction: transaction,
+                              onTap: () {
+                                // TODO: Navigate to transaction details/edit
+                              },
+                              onLongPress: () {
+                                // TODO: Show delete/edit options
+                              },
+                            );
+                          },
+                          childCount: _transactions.length,
+                        ),
+                      ),
+              ],
+            );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // When embedded in MainNavigation, return content only (no Scaffold/AppBar/FAB)
+    if (widget.isEmbedded) {
+      return _buildMainContent();
+    }
+    
+    // When not embedded, return full Scaffold structure
+    return Directionality(
+      textDirection: TextDirection.rtl, // Force RTL layout
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          title: Text(widget.title),
+          centerTitle: true,
+        ),
+        drawer: _buildNavigationDrawer(),
+        body: _buildMainContent(),
         floatingActionButton: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
