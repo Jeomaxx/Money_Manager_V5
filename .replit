@@ -41,3 +41,8 @@ externalPort = 3001
 [[ports]]
 localPort = 41531
 externalPort = 3000
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["dart", "run", "bin/server.dart"]
+build = ["flutter", "build", "web", "--base-href", "/", "--no-web-resources-cdn"]
