@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'services/transaction_service.dart';
 import 'services/auth_service.dart';
 import 'models/transaction.dart';
 import 'widgets/transaction_list_item.dart';
+import 'widgets/animated_balance_card.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/analysis_screen.dart';
 import 'screens/export_screen.dart';
@@ -11,9 +13,16 @@ import 'screens/import_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'theme/app_theme.dart';
+import 'providers/theme_provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 // Authentication Wrapper to check login status
@@ -72,48 +81,38 @@ class _AuthWrapperState extends State<AuthWrapper> {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'مدير المصروفات', // Arabic title
-      // Arabic RTL support configuration
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('ar'), // Arabic
-        Locale('en'), // English fallback
-      ],
-      locale: const Locale('ar'), // Default to Arabic
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-        // Ensure Arabic fonts are supported
-        fontFamily: 'Arial', // Use a font that supports Arabic
-      ),
-      home: const AuthWrapper(),
-      routes: {
-        '/home': (context) => const MyHomePage(title: 'مدير المصروفات الشخصية'),
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'مدير المصروفات', // Arabic title
+          debugShowCheckedModeBanner: false,
+          
+          // Theme configuration
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
+          
+          // Arabic RTL support configuration
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('ar'), // Arabic
+            Locale('en'), // English fallback
+          ],
+          locale: const Locale('ar'), // Default to Arabic
+          
+          home: const AuthWrapper(),
+          routes: {
+            '/home': (context) => const MyHomePage(title: 'مدير المصروفات الشخصية'),
+            '/login': (context) => const LoginScreen(),
+            '/register': (context) => const RegisterScreen(),
+          },
+        );
       },
     );
   }

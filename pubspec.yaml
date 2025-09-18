@@ -46,6 +46,10 @@ dependencies:
   
   # UI Components
   intl: ^0.20.2
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  flutter_staggered_animations: ^1.1.1
+  provider: ^6.1.2
   
   # Charts for analysis
   fl_chart: ^0.69.0

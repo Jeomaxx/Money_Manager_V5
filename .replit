@@ -1,4 +1,4 @@
-modules = ["cpp-clang14", "swift-5.8", "c-clang14", "dart-3.8"]
+modules = ["cpp-clang14", "swift-5.8", "c-clang14", "dart-3.8", "nodejs-20"]
 [agent]
 expertMode = true
 
@@ -33,14 +33,6 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 38533
-externalPort = 3001
-
-[[ports]]
-localPort = 41531
-externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
