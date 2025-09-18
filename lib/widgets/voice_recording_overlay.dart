@@ -213,7 +213,7 @@ class _VoiceRecordingOverlayState extends State<VoiceRecordingOverlay>
               // Transcript display
               Container(
                 width: double.infinity,
-                min­imumHeight: 60,
+                constraints: const BoxConstraints(minHeight: 60),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,

@@ -214,9 +214,70 @@ class _EnhancedAddTransactionScreenState extends State<EnhancedAddTransactionScr
   }
 
   void _processVoiceInput(String voiceText) async {
-    // Voice processing logic (similar to original but with enhanced feedback)
+    // Voice processing logic with enhanced feedback
     HapticFeedback.lightImpact();
-    // ... (voice processing implementation)
+    
+    setState(() {
+      _showVoiceResults = true;
+    });
+
+    try {
+      // Parse voice input for transaction data using static method
+      final result = VoiceTransactionParser.parseVoiceInput(voiceText);
+      
+      if (result.isValid) {
+        // Auto-fill form with voice input results
+        setState(() {
+          if (result.amount != null && result.amount! > 0) {
+            _amountController.text = result.amount.toString();
+          }
+          
+          if (result.type.isNotEmpty) {
+            _selectedType = result.type == 'دخل' || result.type == 'income' 
+                ? TransactionTypes.income 
+                : TransactionTypes.expense;
+            _updateCategoryForType();
+          }
+          
+          if (result.category != null && result.category!.isNotEmpty) {
+            final categories = TransactionCategories.getCategoriesForType(_selectedType);
+            if (categories.contains(result.category!)) {
+              _selectedCategory = result.category!;
+            }
+          }
+          
+          if (result.note != null && result.note!.isNotEmpty) {
+            _noteController.text = result.note!;
+          }
+        });
+        
+        // Show success feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم التعرف على: $voiceText'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        // Show error if voice input couldn't be parsed
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('لم أتمكن من فهم المدخل الصوتي، حاول مرة أخرى'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في معالجة الصوت: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _saveTransaction() async {
@@ -640,6 +701,20 @@ class _EnhancedAddTransactionScreenState extends State<EnhancedAddTransactionScr
             ),
           ],
         ),
+        // Voice Input FAB
+        floatingActionButton: _speechAvailable ? FloatingActionButton(
+          onPressed: _isListening ? _stopListening : _startListening,
+          backgroundColor: _isListening ? Colors.red : Theme.of(context).primaryColor,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _isListening
+                ? const Icon(Icons.mic, key: ValueKey('listening'))
+                : const Icon(Icons.mic_none, key: ValueKey('not_listening')),
+          ),
+        ).animate(target: _speechAvailable ? 1.0 : 0.0)
+          .scaleXY(begin: 0.0, end: 1.0, duration: 400.ms)
+          .fadeIn(duration: 300.ms) : null,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
   }

@@ -24,8 +24,8 @@ class AnimatedBalanceCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final numberFormat = NumberFormat.currency(
-      locale: 'ar_SA',
-      symbol: 'ر.س',
+      locale: 'ar_EG',
+      symbol: 'ج.م',
     );
 
     return Card(
@@ -66,8 +66,8 @@ class AnimatedBalanceCard extends StatelessWidget {
                   ),
                 )
                     .animate()
-                    .scale(delay: 100.ms, duration: 300.ms)
-                    .fadeIn(delay: 100.ms, duration: 300.ms),
+                    .scale(delay: 0.ms, duration: 300.ms)
+                    .fadeIn(delay: 0.ms, duration: 300.ms),
                 const Spacer(),
                 if (isLoading)
                   SizedBox(
