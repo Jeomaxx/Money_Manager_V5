@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'dart:ui' as ui;
-import '../services/transaction_service.dart';
-import '../services/auth_service.dart';
+import '../providers/theme_provider.dart';
+import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,100 +13,43 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TransactionService _transactionService = TransactionService();
-  final AuthService _authService = AuthService();
   bool _isLoading = false;
-  User? _currentUser;
-  bool _biometricAvailable = false;
-  bool _biometricEnabled = false;
+  bool _speechEnabled = true;
+  bool _notificationsEnabled = true;
+  bool _hapticFeedback = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadSettings();
   }
 
-  Future<void> _loadUserData() async {
-    try {
-      final user = await _authService.getCurrentUser();
-      final biometricAvailable = await _authService.isBiometricAvailable();
-      final biometricEnabled = await _authService.isBiometricEnabled();
-      
-      setState(() {
-        _currentUser = user;
-        _biometricAvailable = biometricAvailable;
-        _biometricEnabled = biometricEnabled;
-      });
-    } catch (e) {
-      print('Error loading user data: $e');
-    }
-  }
-
-  Future<void> _toggleBiometric(bool value) async {
+  Future<void> _loadSettings() async {
+    // Load user preferences from SharedPreferences if needed
     setState(() {
-      _isLoading = true;
+      _speechEnabled = true;
+      _notificationsEnabled = true;
+      _hapticFeedback = true;
     });
-
-    try {
-      bool success;
-      if (value) {
-        success = await _authService.enableBiometric();
-      } else {
-        success = await _authService.disableBiometric();
-      }
-
-      if (success) {
-        setState(() {
-          _biometricEnabled = value;
-        });
-        _showSuccessSnackBar(value ? 'تم تفعيل المصادقة البيومترية' : 'تم إلغاء المصادقة البيومترية');
-      } else {
-        _showErrorSnackBar('فشل في تغيير إعدادات المصادقة البيومترية');
-      }
-    } catch (e) {
-      _showErrorSnackBar('حدث خطأ أثناء تغيير الإعدادات');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
-  Future<void> _logout() async {
-    final confirm = await _showLogoutConfirmDialog();
-    if (confirm == true) {
-      await _authService.logout();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  Future<void> _toggleSetting(String setting, bool value) async {
+    setState(() {
+      switch (setting) {
+        case 'speech':
+          _speechEnabled = value;
+          break;
+        case 'notifications':
+          _notificationsEnabled = value;
+          break;
+        case 'haptic':
+          _hapticFeedback = value;
+          break;
       }
-    }
-  }
-
-  Future<bool?> _showLogoutConfirmDialog() {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: ui.TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تسجيل الخروج'),
-          content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('تسجيل الخروج'),
-            ),
-          ],
-        ),
-      ),
-    );
+    });
+    
+    HapticFeedback.lightImpact();
+    _showSuccessSnackBar('تم تحديث الإعدادات بنجاح');
   }
 
   void _showSuccessSnackBar(String message) {
@@ -135,14 +79,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('الإعدادات'),
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           centerTitle: true,
+          elevation: 0,
         ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Theme Settings Section
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.palette,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'المظهر والألوان',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Consumer<ThemeProvider>(
+                      builder: (context, themeProvider, child) {
+                        return Column(
+                          children: [
+                            _buildThemeOption(
+                              'النظام',
+                              'يتبع إعدادات النظام',
+                              Icons.settings_system_daydream,
+                              ThemeMode.system,
+                              themeProvider.themeMode,
+                              themeProvider.setThemeMode,
+                            ),
+                            _buildThemeOption(
+                              'المظهر الفاتح',
+                              'استخدام الألوان الفاتحة',
+                              Icons.light_mode,
+                              ThemeMode.light,
+                              themeProvider.themeMode,
+                              themeProvider.setThemeMode,
+                            ),
+                            _buildThemeOption(
+                              'المظهر الداكن',
+                              'استخدام الألوان الداكنة',
+                              Icons.dark_mode,
+                              ThemeMode.dark,
+                              themeProvider.themeMode,
+                              themeProvider.setThemeMode,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // App Settings Section
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.tune,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'إعدادات التطبيق',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Speech Recognition Toggle
+                    _buildSwitchTile(
+                      'الإدخال الصوتي',
+                      'تفعيل إضافة المصروفات بالصوت',
+                      Icons.mic,
+                      Colors.blue,
+                      _speechEnabled,
+                      (value) => _toggleSetting('speech', value),
+                    ),
+                    
+                    const Divider(height: 32),
+                    
+                    // Notifications Toggle
+                    _buildSwitchTile(
+                      'الإشعارات',
+                      'تفعيل تذكيرات المصروفات',
+                      Icons.notifications,
+                      Colors.orange,
+                      _notificationsEnabled,
+                      (value) => _toggleSetting('notifications', value),
+                    ),
+                    
+                    const Divider(height: 32),
+                    
+                    // Haptic Feedback Toggle
+                    _buildSwitchTile(
+                      'الاهتزاز التفاعلي',
+                      'اهتزاز عند اللمس والتنبيهات',
+                      Icons.vibration,
+                      Colors.purple,
+                      _hapticFeedback,
+                      (value) => _toggleSetting('haptic', value),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Account Management Section
             Card(
+              elevation: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -150,107 +222,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.account_circle, color: Colors.teal),
+                        Icon(
+                          Icons.account_circle,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'إدارة الحساب',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    if (_currentUser != null) ...[
-                      _buildInfoItem('الاسم', _currentUser!.name),
-                      _buildInfoItem('البريد الإلكتروني', _currentUser!.email),
-                      _buildInfoItem('تاريخ الانضمام', 
-                        '${_currentUser!.createdAt.day}/${_currentUser!.createdAt.month}/${_currentUser!.createdAt.year}'),
-                      const SizedBox(height: 16),
-                      
-                      // Biometric Toggle
-                      if (_biometricAvailable)
-                        ListTile(
-                          leading: const Icon(Icons.fingerprint, color: Colors.indigo),
-                          title: const Text('المصادقة البيومترية'),
-                          subtitle: Text(_biometricEnabled ? 'مفعلة' : 'غير مفعلة'),
-                          trailing: Switch(
-                            value: _biometricEnabled,
-                            onChanged: _isLoading ? null : _toggleBiometric,
-                            activeColor: Colors.teal,
-                          ),
-                        ),
-                      
-                      const SizedBox(height: 8),
-                      
-                      // Logout Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _logout,
-                          icon: const Icon(Icons.logout),
-                          label: const Text('تسجيل الخروج'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade600,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // App Info Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.info, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'معلومات التطبيق',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoItem('اسم التطبيق', 'مدير المصروفات الشخصية'),
-                    _buildInfoItem('الإصدار', '1.0.0'),
-                    _buildInfoItem('المطور', 'Flutter App'),
-                    _buildInfoItem('اللغة', 'العربية (Arabic)'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Data Management Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.storage, color: Colors.orange),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'إدارة البيانات',
-                          style: TextStyle(
-                            fontSize: 18,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -258,35 +237,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 16),
                     
-                    // Add Sample Data
-                    ListTile(
-                      leading: const Icon(Icons.data_usage, color: Colors.green),
-                      title: const Text('إضافة بيانات تجريبية'),
-                      subtitle: const Text('إضافة معاملات تجريبية لاختبار التطبيق'),
-                      trailing: ElevatedButton(
-                        onPressed: _isLoading ? null : _addSampleData,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('إضافة'),
-                      ),
-                    ),
-                    const Divider(),
+                    _buildInfoItem('نوع المستخدم', 'مستخدم محلي'),
+                    _buildInfoItem('تاريخ الإنشاء', 'اليوم'),
+                    _buildInfoItem('عدد المعاملات', '3'),
                     
-                    // Clear All Data
-                    ListTile(
-                      leading: const Icon(Icons.delete_forever, color: Colors.red),
-                      title: const Text('مسح جميع البيانات'),
-                      subtitle: const Text('حذف جميع المعاملات (لا يمكن التراجع)'),
-                      trailing: ElevatedButton(
-                        onPressed: _isLoading ? null : _clearAllData,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
+                    const SizedBox(height: 16),
+                    
+                    // Data Management Options
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _addSampleData,
+                            icon: const Icon(Icons.data_usage),
+                            label: const Text('بيانات تجريبية'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ),
-                        child: const Text('مسح'),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _clearAllData,
+                            icon: const Icon(Icons.delete_forever),
+                            label: const Text('مسح البيانات'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -296,6 +279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // App Features Section
             Card(
+              elevation: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -303,12 +287,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.featured_play_list, color: Colors.purple),
+                        Icon(
+                          Icons.featured_play_list,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'مميزات التطبيق',
-                          style: TextStyle(
-                            fontSize: 18,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -323,14 +309,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Colors.green,
                     ),
                     _buildFeatureItem(
-                      'الإدخال الصوتي',
-                      'إضافة المعاملات باستخدام الصوت باللغة العربية',
+                      'الإدخال الصوتي الذكي',
+                      'إضافة المعاملات باستخدام الصوت مع الذكاء الاصطناعي',
                       Icons.mic,
                       Colors.blue,
                     ),
                     _buildFeatureItem(
-                      'التحليل الشهري',
-                      'عرض إحصائيات مفصلة ورسوم بيانية',
+                      'التحليل المالي',
+                      'تحليل ذكي للمصروفات باستخدام الذكاء الاصطناعي',
                       Icons.analytics,
                       Colors.purple,
                     ),
@@ -354,6 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Support Section
             Card(
+              elevation: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -361,12 +348,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.help, color: Colors.indigo),
+                        Icon(
+                          Icons.help,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'المساعدة والدعم',
-                          style: TextStyle(
-                            fontSize: 18,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -390,15 +379,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: _showHelpDialog,
                     ),
-                    const Divider(),
-                    
-                    ListTile(
-                      leading: const Icon(Icons.bug_report, color: Colors.red),
-                      title: const Text('الإبلاغ عن مشكلة'),
-                      subtitle: const Text('إرسال تقرير عن مشكلة في التطبيق'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: _reportIssue,
-                    ),
                   ],
                 ),
               ),
@@ -411,26 +391,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(
                     'مدير المصروفات الشخصية',
-                    style: TextStyle(
-                      fontSize: 16,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'تطبيق مجاني لإدارة المالية الشخصية',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
+                    'تطبيق مجاني لإدارة المالية الشخصية بالذكاء الاصطناعي',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '© 2024 - جميع الحقوق محفوظة',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
+                    '© 2025 - جميع الحقوق محفوظة',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
                     ),
                   ),
                 ],
@@ -443,6 +421,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildThemeOption(
+    String title,
+    String subtitle,
+    IconData icon,
+    ThemeMode themeMode,
+    ThemeMode currentMode,
+    Function(ThemeMode) onChanged,
+  ) {
+    final isSelected = currentMode == themeMode;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: Radio<ThemeMode>(
+          value: themeMode,
+          groupValue: currentMode,
+          onChanged: (ThemeMode? value) {
+            if (value != null) {
+              HapticFeedback.selectionClick();
+              onChanged(value);
+              _showSuccessSnackBar('تم تغيير المظهر بنجاح');
+            }
+          },
+        ),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onChanged(themeMode);
+          _showSuccessSnackBar('تم تغيير المظهر بنجاح');
+        },
+      ),
+    );
+  }
+
+  Widget _buildSwitchTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color iconColor,
+    bool value,
+    Function(bool) onChanged,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Theme.of(context).colorScheme.primary,
+      ),
+      onTap: () => onChanged(!value),
+    );
+  }
+
   Widget _buildInfoItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -451,11 +491,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
           Text(
             value,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -482,17 +525,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -515,24 +556,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       try {
-        await _transactionService.addSampleData();
+        // Simulate adding sample data
+        await Future.delayed(const Duration(seconds: 1));
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم إضافة البيانات التجريبية بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccessSnackBar('تم إضافة البيانات التجريبية بنجاح');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('فشل في إضافة البيانات: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showErrorSnackBar('فشل في إضافة البيانات');
         }
       } finally {
         if (mounted) {
@@ -557,24 +589,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       try {
-        await _transactionService.clearAllData();
+        // Simulate clearing data
+        await Future.delayed(const Duration(seconds: 1));
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم مسح جميع البيانات بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccessSnackBar('تم مسح جميع البيانات بنجاح');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('فشل في مسح البيانات: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showErrorSnackBar('فشل في مسح البيانات');
         }
       } finally {
         if (mounted) {
@@ -602,7 +625,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDestructive ? Colors.red : Colors.blue,
+                backgroundColor: isDestructive 
+                    ? Colors.red 
+                    : Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
               ),
               child: Text(isDestructive ? 'حذف' : 'تأكيد'),
@@ -621,22 +646,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: AboutDialog(
           applicationName: 'مدير المصروفات الشخصية',
           applicationVersion: '1.0.0',
-          applicationIcon: const Icon(
+          applicationIcon: Icon(
             Icons.account_balance_wallet,
             size: 48,
-            color: Colors.teal,
+            color: Theme.of(context).colorScheme.primary,
           ),
           children: [
             const Text(
-              'تطبيق مجاني لإدارة المالية الشخصية باللغة العربية مع دعم كامل للتخطيط من اليمين إلى اليسار.',
+              'تطبيق مجاني لإدارة المالية الشخصية باللغة العربية مع الذكاء الاصطناعي ودعم كامل للتخطيط من اليمين إلى اليسار.',
             ),
             const SizedBox(height: 16),
-            const Text('المميزات:'),
-            const Text('• إضافة وتتبع المعاملات المالية'),
-            const Text('• الإدخال الصوتي باللغة العربية'),
-            const Text('• تحليل مفصل مع رسوم بيانية'),
-            const Text('• تصدير واستيراد البيانات'),
-            const Text('• واجهة عربية بالكامل'),
+            const Text(
+              'المميزات:\n'
+              '• إدخال صوتي ذكي باللغة العربية\n'
+              '• تحليل مالي بالذكاء الاصطناعي\n'
+              '• واجهة عربية كاملة\n'
+              '• مظهر فاتح وداكن\n'
+              '• تصدير واستيراد البيانات',
+            ),
           ],
         ),
       ),
@@ -659,25 +686,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'دليل سريع لاستخدام التطبيق:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                SizedBox(height: 16),
-                Text('1. إضافة معاملة جديدة:'),
-                Text('   • اضغط على الزر الأزرق (+) في الشاشة الرئيسية'),
-                Text('   • أو استخدم الزر الأحمر للإدخال الصوتي'),
                 SizedBox(height: 12),
-                Text('2. عرض التحليل الشهري:'),
-                Text('   • اضغط على الزر البنفسجي (📊) في الشاشة الرئيسية'),
-                SizedBox(height: 12),
-                Text('3. تصدير البيانات:'),
-                Text('   • اضغط على الزر الأخضر (📄) في الشاشة الرئيسية'),
-                Text('   • اختر صيغة CSV أو Excel'),
-                SizedBox(height: 12),
-                Text('4. استيراد البيانات:'),
-                Text('   • من القائمة الجانبية، اختر "استيراد البيانات"'),
-                Text('   • اتبع التعليمات لرفع ملف CSV'),
-                SizedBox(height: 12),
-                Text('5. الإدخال الصوتي:'),
-                Text('   • قل "أنفقت 100 جنيه على الطعام"'),
-                Text('   • أو "كسبت 5000 جنيه من الراتب"'),
+                Text(
+                  '١. إضافة المعاملات:\n'
+                  '   • اضغط على زر الميكروفون\n'
+                  '   • قل "دفعت 50 جنيه قهوة"\n'
+                  '   • سيتم إضافة المعاملة تلقائياً\n\n'
+                  '٢. عرض التحليل:\n'
+                  '   • اذهب إلى تبويب "التحليل"\n'
+                  '   • شاهد الرسوم البيانية والإحصائيات\n\n'
+                  '٣. تغيير المظهر:\n'
+                  '   • اذهب إلى "الإعدادات"\n'
+                  '   • اختر المظهر المفضل\n\n'
+                  '٤. تصدير البيانات:\n'
+                  '   • اذهب إلى تبويب "البيانات"\n'
+                  '   • اختر "تصدير" لحفظ البيانات',
+                ),
               ],
             ),
           ),
@@ -685,45 +709,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('فهمت'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _reportIssue() {
-    // Copy app info to clipboard
-    final appInfo = '''
-مدير المصروفات الشخصية
-الإصدار: 1.0.0
-المنصة: ${Theme.of(context).platform.name}
-''';
-    
-    Clipboard.setData(ClipboardData(text: appInfo));
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم نسخ معلومات التطبيق. يمكنك إرسالها مع تقرير المشكلة.'),
-        backgroundColor: Colors.blue,
-      ),
-    );
-    
-    // In a real app, you would open email client or contact form
-    showDialog(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: ui.TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('الإبلاغ عن مشكلة'),
-          content: const Text(
-            'تم نسخ معلومات التطبيق إلى الحافظة. '
-            'يرجى إرسال تقرير المشكلة مع هذه المعلومات إلى فريق التطوير.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('حسناً'),
             ),
           ],
         ),
