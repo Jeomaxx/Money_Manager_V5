@@ -1,9 +1,10 @@
-modules = ["python-3.11", "dart-3.8"]
+modules = ["cpp-clang14", "swift-5.8", "c-clang14", "dart-3.8"]
 [agent]
 expertMode = true
 
 [nix]
 channel = "stable-25_05"
+packages = ["flutter"]
 
 [workflows]
 runButton = "Project"
@@ -32,3 +33,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 41531
+externalPort = 3000
