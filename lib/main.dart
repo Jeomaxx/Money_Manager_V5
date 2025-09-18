@@ -15,6 +15,7 @@ import 'widgets/animated_transaction_list.dart';
 import 'models/transaction.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
+import 'repositories/hive_transaction_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,9 +23,16 @@ void main() async {
   // Initialize Hive for local storage
   await Hive.initFlutter();
   
+  // Initialize transaction repository
+  final transactionRepository = HiveTransactionRepository();
+  await transactionRepository.init();
+  
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+        Provider<HiveTransactionRepository>.value(value: transactionRepository),
+      ],
       child: const MyApp(),
     ),
   );
@@ -191,16 +199,32 @@ class _MyHomePageState extends State<MyHomePage>
 
   Future<void> _loadData() async {
     try {
-      // Simulate loading data from local storage
-      await Future.delayed(const Duration(milliseconds: 800));
+      // Load actual data from Hive database
+      final repository = Provider.of<HiveTransactionRepository>(context, listen: false);
       
-      // Load actual data using DatabaseHelper or HiveTransactionRepository
-      // For now using sample data, but in production this should load from Hive
+      // Add sample data if database is empty
+      await _addSampleDataIfEmpty(repository);
+      
+      final transactions = await repository.getAllTransactions();
+      final balance = await repository.getTotalBalance();
+      
+      // Calculate income and expenses
+      double totalIncome = 0.0;
+      double totalExpenses = 0.0;
+      
+      for (final transaction in transactions) {
+        if (transaction.type == TransactionTypes.income) {
+          totalIncome += transaction.amount;
+        } else if (transaction.type == TransactionTypes.expense) {
+          totalExpenses += transaction.amount;
+        }
+      }
+      
       setState(() {
-        _balance = 15000.0;
-        _income = 25000.0;
-        _expenses = 10000.0;
-        _transactions = _generateSampleTransactions();
+        _balance = balance;
+        _income = totalIncome;
+        _expenses = totalExpenses;
+        _transactions = transactions.take(5).toList(); // Show recent 5
         _isLoading = false;
       });
       
@@ -221,42 +245,36 @@ class _MyHomePageState extends State<MyHomePage>
     }
   }
 
-  List<Transaction> _generateSampleTransactions() {
-    final now = DateTime.now();
-    return [
-      Transaction(
-        id: 1,
-        amount: 500.0,
-        type: TransactionTypes.expense,
-        category: 'طعام',
-        note: 'غداء في مطعم',
-        date: now.subtract(const Duration(hours: 2)),
-      ),
-      Transaction(
-        id: 2,
+  // Add some sample data if none exists
+  Future<void> _addSampleDataIfEmpty(HiveTransactionRepository repository) async {
+    final existingTransactions = await repository.getAllTransactions();
+    if (existingTransactions.isEmpty) {
+      final now = DateTime.now();
+      
+      await repository.addTransaction(Transaction(
         amount: 25000.0,
         type: TransactionTypes.income,
         category: 'راتب',
         note: 'راتب شهر ${now.month}',
         date: now.subtract(const Duration(days: 1)),
-      ),
-      Transaction(
-        id: 3,
+      ));
+      
+      await repository.addTransaction(Transaction(
+        amount: 500.0,
+        type: TransactionTypes.expense,
+        category: 'طعام',
+        note: 'غداء في مطعم',
+        date: now.subtract(const Duration(hours: 2)),
+      ));
+      
+      await repository.addTransaction(Transaction(
         amount: 200.0,
         type: TransactionTypes.expense,
         category: 'مواصلات',
-        note: 'مواصلات',
+        note: 'مواصلات يومية',
         date: now.subtract(const Duration(days: 2)),
-      ),
-      Transaction(
-        id: 4,
-        amount: 1500.0,
-        type: TransactionTypes.expense,
-        category: 'فواتير',
-        note: 'فاتورة كهرباء',
-        date: now.subtract(const Duration(days: 3)),
-      ),
-    ];
+      ));
+    }
   }
 
   @override
@@ -433,6 +451,14 @@ class _MyHomePageState extends State<MyHomePage>
                   ],
                 ),
               ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            // Navigate to enhanced add transaction screen with voice support
+            Navigator.of(context).pushNamed('/add-transaction');
+          },
+          child: const Icon(Icons.add),
+          tooltip: 'إضافة معاملة جديدة',
+        ),
       ),
     );
   }
