@@ -71,22 +71,39 @@ void main() async {
   print('AI API endpoints available at /api/');
 }
 
-// CORS middleware for mobile app communication
+// Secure CORS middleware with proper origin handling
 Middleware _corsHeaders = (handler) {
+  // In production, restrict to your actual domain
+  final allowedOrigins = [
+    'http://localhost:5000',
+    'https://localhost:5000',
+    Platform.environment['REPLIT_DOMAIN'] != null 
+        ? 'https://${Platform.environment['REPLIT_DOMAIN']}'
+        : null,
+  ].where((origin) => origin != null).cast<String>().toList();
+  
   return (request) async {
+    final origin = request.headers['origin'];
+    final isAllowedOrigin = origin == null || allowedOrigins.contains(origin);
+    
     if (request.method == 'OPTIONS') {
       return Response.ok('', headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Origin': isAllowedOrigin ? origin ?? '*' : 'null',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With',
+        'Access-Control-Max-Age': '86400',
       });
+    }
+    
+    if (!isAllowedOrigin) {
+      return Response.forbidden('Origin not allowed');
     }
     
     final response = await handler(request);
     return response.change(headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Origin': origin ?? allowedOrigins.first,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With',
       ...response.headers,
     });
   };

@@ -3,7 +3,16 @@ import 'package:http/http.dart' as http;
 
 /// Client service for communicating with server-side AI endpoints
 class AIClientService {
-  static const String _baseUrl = 'http://localhost:5000/api';
+  // Dynamic base URL that works on web and mobile
+  static String get _baseUrl {
+    // On web, use relative URLs
+    if (identical(0, 0.0)) { // Web check
+      return '/api';
+    }
+    // On mobile/desktop, use the current host
+    return 'http://localhost:5000/api';
+  }
+  
   static const Duration _timeout = Duration(seconds: 10);
 
   /// Test connection to AI service
