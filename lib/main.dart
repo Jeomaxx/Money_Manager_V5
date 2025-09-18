@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 // Import your providers and services
 import 'providers/theme_provider.dart';
@@ -12,8 +13,15 @@ import 'widgets/main_navigation.dart';
 import 'widgets/animated_balance_card.dart';
 import 'widgets/animated_transaction_list.dart';
 import 'models/transaction.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive for local storage
+  await Hive.initFlutter();
+  
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
@@ -44,13 +52,70 @@ class MyApp extends StatelessWidget {
             Locale('en'), // English fallback
           ],
           locale: const Locale('ar'), // Default to Arabic
-          home: MainNavigation(
+          home: const AuthWrapper(),
+          routes: {
+            '/home': (context) => MainNavigation(
+              homeScreen: const MyHomePage(
+                title: 'مدير المصروفات الشخصية',
+                isEmbedded: true,
+              ),
+            ),
+            '/login': (context) => const LoginScreen(),
+          },
+        );
+      },
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: AuthService().isLoggedIn(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet,
+                    size: 80,
+                    color: Colors.teal,
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    'مدير المصروفات',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        if (snapshot.data == true) {
+          return MainNavigation(
             homeScreen: const MyHomePage(
               title: 'مدير المصروفات الشخصية',
               isEmbedded: true,
             ),
-          ),
-        );
+          );
+        } else {
+          return const LoginScreen();
+        }
       },
     );
   }
@@ -125,260 +190,249 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _loadData() async {
-    // Add haptic feedback for loading start
-    HapticFeedback.lightImpact();
-    
-    setState(() {
-      _isLoading = true;
-    });
+    try {
+      // Simulate loading data from local storage
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // Load actual data using DatabaseHelper or HiveTransactionRepository
+      // For now using sample data, but in production this should load from Hive
+      setState(() {
+        _balance = 15000.0;
+        _income = 25000.0;
+        _expenses = 10000.0;
+        _transactions = _generateSampleTransactions();
+        _isLoading = false;
+      });
+      
+      _slideController.forward();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ في تحميل البيانات: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
-    // Simulate loading data with realistic delay
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    // Mock data for demonstration
-    final mockTransactions = [
+  List<Transaction> _generateSampleTransactions() {
+    final now = DateTime.now();
+    return [
       Transaction(
         id: 1,
         amount: 500.0,
-        type: TransactionTypes.income,
-        category: 'راتب',
-        note: 'راتب شهر سبتمبر',
-        date: DateTime.now().subtract(const Duration(days: 1)),
+        type: TransactionTypes.expense,
+        category: TransactionCategories.food,
+        note: 'غداء في مطعم',
+        date: now.subtract(const Duration(hours: 2)),
       ),
       Transaction(
         id: 2,
-        amount: 120.0,
-        type: TransactionTypes.expense,
-        category: 'طعام',
-        note: 'عشاء مع الأصدقاء',
-        date: DateTime.now().subtract(const Duration(hours: 12)),
+        amount: 25000.0,
+        type: TransactionTypes.income,
+        category: TransactionCategories.salary,
+        note: 'راتب شهر ${now.month}',
+        date: now.subtract(const Duration(days: 1)),
       ),
       Transaction(
         id: 3,
-        amount: 50.0,
+        amount: 200.0,
         type: TransactionTypes.expense,
-        category: 'مواصلات',
-        note: 'تذاكر الحافلة',
-        date: DateTime.now().subtract(const Duration(hours: 6)),
+        category: TransactionCategories.transportation,
+        note: 'مواصلات',
+        date: now.subtract(const Duration(days: 2)),
+      ),
+      Transaction(
+        id: 4,
+        amount: 1500.0,
+        type: TransactionTypes.expense,
+        category: TransactionCategories.bills,
+        note: 'فاتورة كهرباء',
+        date: now.subtract(const Duration(days: 3)),
       ),
     ];
-
-    final totalIncome = mockTransactions
-        .where((t) => t.type == TransactionTypes.income)
-        .fold(0.0, (sum, t) => sum + t.amount);
-    
-    final totalExpenses = mockTransactions
-        .where((t) => t.type == TransactionTypes.expense)
-        .fold(0.0, (sum, t) => sum + t.amount);
-
-    setState(() {
-      _transactions = mockTransactions;
-      _income = totalIncome;
-      _expenses = totalExpenses;
-      _balance = _income - _expenses;
-      _isLoading = false;
-    });
-
-    // Animate in the content after loading
-    _slideController.forward();
-    
-    // Add haptic feedback for loading complete
-    HapticFeedback.mediumImpact();
-  }
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulseAnimation.value,
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary,
-                        Theme.of(context).colorScheme.primaryContainer,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: const Icon(
-                    Icons.account_balance_wallet,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: AppTheme.spacingL),
-          Text(
-            'جاري تحميل البيانات...',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          )
-              .animate(onPlay: (controller) => controller.repeat())
-              .fadeIn(duration: 800.ms)
-              .fadeOut(delay: 800.ms, duration: 800.ms),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKPICards() {
-    return AnimationLimiter(
-      child: Column(
-        children: AnimationConfiguration.toStaggeredList(
-          duration: const Duration(milliseconds: 375),
-          childAnimationBuilder: (widget) => SlideAnimation(
-            horizontalOffset: 50.0,
-            child: FadeInAnimation(child: widget),
-          ),
-          children: [
-            // Main Balance Card
-            AnimatedBalanceCard(
-              balance: _balance,
-              title: 'الرصيد الحالي',
-              icon: Icons.account_balance_wallet,
-              backgroundColor: AppTheme.getBalanceColor(context, _balance),
-              isLoading: _isLoading,
-            )
-                .animate()
-                .scaleXY(begin: 0.8, duration: 500.ms, curve: Curves.elasticOut)
-                .fadeIn(duration: 400.ms),
-            
-            const SizedBox(height: AppTheme.spacingM),
-            
-            // Income and Expense Cards Row
-            Row(
-              children: [
-                // Income Card
-                Expanded(
-                  child: AnimatedBalanceCard(
-                    balance: _income,
-                    title: 'إجمالي الدخل',
-                    icon: Icons.trending_up,
-                    backgroundColor: AppTheme.incomeColor,
-                    isLoading: _isLoading,
-                  )
-                      .animate()
-                      .slideX(begin: -0.3, duration: 400.ms, delay: 200.ms)
-                      .fadeIn(duration: 400.ms, delay: 200.ms),
-                ),
-                
-                const SizedBox(width: AppTheme.spacingM),
-                
-                // Expenses Card
-                Expanded(
-                  child: AnimatedBalanceCard(
-                    balance: _expenses,
-                    title: 'إجمالي المصروفات',
-                    icon: Icons.trending_down,
-                    backgroundColor: AppTheme.expenseColor,
-                    isLoading: _isLoading,
-                  )
-                      .animate()
-                      .slideX(begin: 0.3, duration: 400.ms, delay: 400.ms)
-                      .fadeIn(duration: 400.ms, delay: 400.ms),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionsList() {
-    if (_isLoading) {
-      return const SliverToBoxAdapter(child: SizedBox());
-    }
-
-    return SliverToBoxAdapter(
-      child: SizedBox(
-        height: 400, // Fixed height to prevent layout issues
-        child: AnimatedTransactionList(
-          transactions: _transactions,
-          onTransactionTap: (transaction) {
-            // Navigate to transaction details
-          },
-          onTransactionDelete: (transaction) {
-            // Handle transaction deletion
-            setState(() {
-              _transactions.removeWhere((t) => t.id == transaction.id);
-            });
-          },
-          onShowAll: () {
-            // Navigate to all transactions screen
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMainContent() {
-    return _isLoading
-        ? _buildLoadingState()
-        : SlideTransition(
-            position: _slideAnimation,
-            child: RefreshIndicator(
-              onRefresh: _loadData,
-              color: Theme.of(context).colorScheme.primary,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppTheme.spacingL),
-                      child: _buildKPICards(),
-                    ),
-                  ),
-                  _buildTransactionsList(),
-                  // Add some bottom padding for the floating action button
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 100),
-                  ),
-                ],
-              ),
-            ),
-          );
   }
 
   @override
   Widget build(BuildContext context) {
-    // When embedded in MainNavigation, return content only
-    if (widget.isEmbedded) {
-      return Directionality(
-        textDirection: TextDirection.rtl,
-        child: _buildMainContent(),
-      );
-    }
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
-    // When not embedded, return full Scaffold structure (fallback)
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          centerTitle: true,
-        ),
-        body: _buildMainContent(),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            HapticFeedback.mediumImpact();
-            // TODO: Add new transaction
-          },
-          tooltip: 'إضافة معاملة',
-          child: const Icon(Icons.add),
-        ),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: _isLoading
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ScaleTransition(
+                      scale: _pulseAnimation,
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: theme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet,
+                          size: 64,
+                          color: theme.primaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'جاري تحميل البيانات...',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
+                    ),
+                  ],
+                ),
+              )
+            : SlideTransition(
+                position: _slideAnimation,
+                child: CustomScrollView(
+                  slivers: [
+                    // App Bar
+                    SliverAppBar(
+                      expandedHeight: 160,
+                      floating: false,
+                      pinned: true,
+                      elevation: 0,
+                      backgroundColor: theme.primaryColor,
+                      flexibleSpace: FlexibleSpaceBar(
+                        title: Text(
+                          widget.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        background: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                theme.primaryColor,
+                                theme.primaryColor.withOpacity(0.8),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      actions: [
+                        Consumer<ThemeProvider>(
+                          builder: (context, themeProvider, child) {
+                            return IconButton(
+                              icon: Icon(
+                                themeProvider.isDarkMode 
+                                    ? Icons.light_mode 
+                                    : Icons.dark_mode,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                themeProvider.toggleTheme();
+                              },
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.logout, color: Colors.white),
+                          onPressed: () async {
+                            await AuthService().logout();
+                            if (mounted) {
+                              Navigator.of(context).pushReplacementNamed('/login');
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    // Balance Card
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: AnimatedBalanceCard(
+                          balance: _balance,
+                          income: _income,
+                          expenses: _expenses,
+                        ),
+                      ).animate().fadeIn(
+                        duration: AppTheme.animationMedium,
+                        delay: const Duration(milliseconds: 200),
+                      ),
+                    ),
+                    
+                    // Recent Transactions
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'المعاملات الأخيرة',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                // Navigate to transactions screen
+                              },
+                              child: Text(
+                                'عرض الكل',
+                                style: TextStyle(
+                                  color: theme.primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().slideX(
+                        duration: AppTheme.animationMedium,
+                        delay: const Duration(milliseconds: 400),
+                      ),
+                    ),
+                    
+                    // Transaction List
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: AnimatedTransactionList(
+                          transactions: _transactions.take(5).toList(),
+                        ),
+                      ).animate().fadeIn(
+                        duration: AppTheme.animationMedium,
+                        delay: const Duration(milliseconds: 600),
+                      ),
+                    ),
+                    
+                    // Bottom spacing
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: 100),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }
